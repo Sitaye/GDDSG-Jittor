@@ -32,22 +32,11 @@ def maxsplit(vertex:list,edge:dict):
                 break
             else:
                 num += 1
-        neibor = set()
-        for u in edge[degree[num][0]]:
-            neibor.add(u)
-        for v in vertex:
-            if not visit[visitmp[v]] and v not in neibor:
-                nowsplit.append(v)
-                visit[visitmp[v]] = 1
-                for u in edge[v]:
-                    neibor.add(u)
         split.append(nowsplit)
     return split
 
 
 if __name__ == '__main__':
-    adj_matrix = np.load(r"C:\Users\laigu\Desktop\ITCIL\array_dogs.npy")
-    print(adj_matrix)
     for i in range(120):
         if adj_matrix[47][i] == 1:
             print(i,end = " ")
