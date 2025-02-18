@@ -8,7 +8,7 @@ import torch
 
 from utils.data_manager import DataManager
 from utils.toolkit import count_parameters
-from SALF import Learner
+from GDDSG import Learner
 def train(args):
     seed_list = copy.deepcopy(args["seed"])
     device = copy.deepcopy(args["device"])
@@ -70,7 +70,6 @@ def _train(args):
         num_tasks=len(dil_tasks)
         model.is_dil=True
     else:
-        #cil datasets
         model.is_dil=False
         data_manager = DataManager(
             args['dataset'],
@@ -99,6 +98,7 @@ def _train(args):
         model.incremental_train(data_manager)
         model.after_task()
         model.test_for_all_task(task,data_manager)
+    np.save(f"result.npy", model.metric)
     logging.info('Finishing run')
     logging.info('')
     return 0
