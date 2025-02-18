@@ -88,7 +88,7 @@ class DataManager(object):
         if 'domainnet' not in dataset_name :
             if shuffle:
                 np.random.seed(seed)
-                order = np.random.permutation(120).tolist()
+                order = np.random.permutation(idata.class_order)
             else:
                 order = idata.class_order
             self._class_order = order
@@ -138,7 +138,8 @@ class DummyDataset(Dataset):
 
 
 def _map_new_class_index(y, order):
-    return np.array(list(map(lambda x: order.index(x), y)))
+    return np.array([np.where(order == x)[0][0] for x in y])
+
 
 def _get_idata(dataset_name,use_input_norm):
     name = dataset_name.lower()
