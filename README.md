@@ -85,7 +85,7 @@ You can modify the parameters in `dataset_name_publish.csv` where *dataset_name*
 |Jittor(*this repo*)| 2.04 ± 0.59 | 0.48 ± 3.76 | 1.31 ± 0.45 | 1.25 ± 0.52 |
 |PyTorch(*upstream*)| 0.78 ± 0.09 | 1.92 ± 1.29 | 1.42 ± 0.08 | 0.96 ± 0.16 |
 
-### Table 3. Runtime usage $T_N(\%)$ on four datasets.
+### Table 3. Runtime usage $T_N$ on four datasets.
 
 | Frame | CIFAR100 | CUB200 | Dog | OB |
 |:-:|:-:|:-:|:-:|:-:|
