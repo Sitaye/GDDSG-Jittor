@@ -164,6 +164,18 @@ class HybridEmbed(nn.Module):
         return x
 
 
+class PreLogits(nn.Module):
+    def __init__(self, in_features, out_features, act_layer=nn.Tanh):
+        super().__init__()
+        self.fc = nn.Linear(in_features, out_features)
+        self.act = act_layer()
+
+    def execute(self, x):
+        x = self.fc(x)
+        x = self.act(x)
+        return x
+    
+
 class VisionTransformer(nn.Module):
     """ Vision Transformer with support for patch or hybrid CNN input stage
     """
@@ -176,13 +188,14 @@ class VisionTransformer(nn.Module):
                  depth=12,
                  num_heads=12, 
                  mlp_ratio=4., 
-                 qkv_bias=False, 
+                 qkv_bias=True, 
                  qk_scale=None, 
                  drop_rate=0., 
                  attn_drop_rate=0.,
                  drop_path_rate=0., 
                  hybrid_backbone=None, 
-                 norm_layer=nn.LayerNorm):
+                 norm_layer=partial(nn.LayerNorm, eps=1e-6),
+                 representation_size=None):
         super(VisionTransformer,self).__init__()
         if hybrid_backbone is not None:
             self.patch_embed = HybridEmbed(hybrid_backbone, img_size=img_size, in_chans=in_chans, embed_dim=embed_dim)
@@ -208,7 +221,17 @@ class VisionTransformer(nn.Module):
         #self.repr_act = nn.Tanh()
 
         # Classifier head
-        self.head = nn.Linear(embed_dim, num_classes)
+        if representation_size:
+            self.has_logits = True
+            self.pre_logits = PreLogits(
+                in_features=embed_dim,
+                out_features=representation_size
+            )
+            self.head = nn.Linear(representation_size, num_classes) if num_classes > 0 else nn.Identity()
+        else:
+            self.has_logits = False
+            self.pre_logits = nn.Identity()
+            self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
         self.pos_embed = trunc_normal(self.pos_embed, std=.02)
         self.cls_token = trunc_normal(self.cls_token, std=.02)
@@ -242,15 +265,15 @@ class VisionTransformer(nn.Module):
             x = blk(x)
 
         x = self.norm(x)
-        x = self.head(x[:, 0])
+        x = self.pre_logits(x[:, 0])
+        x = self.head(x)
         return x
 
 
-
 def vit_small_patch16_224(pretrained=False, **kwargs):
-    if pretrained:
-        # NOTE my scale was wrong for original weights, leaving this here until I have better ones for this model
-        kwargs.setdefault('qk_scale', 768 ** -0.5)
+    # if pretrained:
+    #     # NOTE my scale was wrong for original weights, leaving this here until I have better ones for this model
+    #     kwargs.setdefault('qk_scale', 768 ** -0.5)
     model = VisionTransformer(patch_size=16, embed_dim=768, depth=8, num_heads=8, mlp_ratio=3., **kwargs)
     model.default_cfg = default_cfgs['vit_small_patch16_224']
     if pretrained:
@@ -261,9 +284,9 @@ def vit_small_patch16_224(pretrained=False, **kwargs):
 
 
 def vit_base_patch16_224(pretrained=False, **kwargs):
-    if pretrained:
-        # NOTE my scale was wrong for original weights, leaving this here until I have better ones for this model
-        kwargs.setdefault('qk_scale', 768 ** -0.5)
+    # if pretrained:
+    #     # NOTE my scale was wrong for original weights, leaving this here until I have better ones for this model
+    #     kwargs.setdefault('qk_scale', 768 ** -0.5)
     model = VisionTransformer(patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, **kwargs)
     model.default_cfg = default_cfgs['vit_base_patch16_224']
     if pretrained:
@@ -271,6 +294,17 @@ def vit_base_patch16_224(pretrained=False, **kwargs):
             model, num_classes=kwargs.get('num_classes', 0), in_chans=kwargs.get('in_chans', 3), filter_fn=_conv_filter)
     return model
 
+
+def vit_base_patch16_224_in21k(pretrained=False, **kwargs):
+    # if pretrained:
+    #     # NOTE my scale was wrong for original weights, leaving this here until I have better ones for this model
+    #     kwargs.setdefault('qk_scale', 768 ** -0.5)
+    model = VisionTransformer(patch_size=16, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4, qkv_bias=True, **kwargs)
+    model.default_cfg = default_cfgs['vit_base_patch16_224_in21k']
+    if pretrained:
+        load_pretrained(
+            model, num_classes=kwargs.get('num_classes', 0), in_chans=kwargs.get('in_chans', 3), filter_fn=_conv_filter)
+    return model
 
 
 def vit_base_patch16_384(pretrained=False, **kwargs):
@@ -350,10 +384,11 @@ MODELS = {
     'vit_base_patch32_384':vit_base_patch32_384,
     'vit_base_patch16_384':vit_base_patch16_384,
     'vit_base_patch16_224':vit_base_patch16_224,
+    'vit_base_patch16_224_in21k':vit_base_patch16_224_in21k,
     'vit_small_patch16_224':vit_small_patch16_224
 }
 
 def create_model(name,**kwargs):
     assert name in MODELS.keys()
     return MODELS[name](**kwargs)
-    
+

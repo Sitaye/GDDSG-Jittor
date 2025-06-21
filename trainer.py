@@ -4,7 +4,9 @@ import numpy as np
 import os
 import pandas as pd
 import sys
-import torch
+# import torch
+import jittor as jt
+import time
 
 from utils.data_manager import DataManager
 from utils.toolkit import count_parameters
@@ -22,6 +24,7 @@ def train(args):
 
 
 def _train(args):
+    start_time = time.time()
 
     init_cls = 0 if args ["init_cls"] == args["increment"] else args["init_cls"]
     logs_name = "logs/{}/{}/{}/{}".format(args["model_name"],args["dataset"], init_cls, args['increment'])
@@ -98,7 +101,16 @@ def _train(args):
         model.incremental_train(data_manager)
         model.after_task()
         model.test_for_all_task(task,data_manager)
-    np.save(f"result.npy", model.metric)
+    # np.save(f"result.npy", model.metric)
+    log_df = pd.DataFrame(model.results_log)
+    log_df.to_csv(logfilename + "_results.csv", index=False)
+    if len(model.loss_history) > 0:
+        loss_df = pd.DataFrame(model.loss_history)
+        loss_df.to_csv(logfilename + "_loss_history.csv", index=False)
+        logging.info(f"Loss history saved to {logfilename}_loss_history.csv")
+    np.save(f"result_{args['dataset']}_{args['model_name']}_{args['seed']}.npy", model.metric)
+    end_time = time.time()
+    logging.info(f"Total training time: {end_time - start_time:.2f} seconds")
     logging.info('Finishing run')
     logging.info('')
     return 0
@@ -120,18 +132,21 @@ def _set_device(args):
     gpus = []
     for device in device_type:
         if device_type == -1:
-            device = torch.device("cpu")
+            # device = torch.device("cpu")
+            jt.flags.use_device = 0
         else:
-            device = torch.device("cuda:{}".format(device))
+            # device = torch.device("cuda:{}".format(device))
+            jt.flags.use_device = 1
         gpus.append(device)
     args["device"] = gpus
 
 def _set_random():
-    torch.manual_seed(1)
-    torch.cuda.manual_seed(1)
-    torch.cuda.manual_seed_all(1)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # torch.manual_seed(1)
+    # torch.cuda.manual_seed(1)
+    # torch.cuda.manual_seed_all(1)
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
+    jt.set_seed(1)
 
 def print_args(args):
     for key, value in args.items():

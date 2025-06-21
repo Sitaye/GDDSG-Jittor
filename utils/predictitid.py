@@ -1,3 +1,4 @@
+import logging
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
@@ -104,8 +105,8 @@ def train_model(train_data):
     best_a = study.best_params['a']
     best_b = study.best_params['b']
     best_c = 1 - best_a - best_b 
-    print(f"Best parameters: a={best_a}, b={best_b}, c={best_c}")
-    print(f"Best accuracy: {study.best_value}")
+    logging.info(f"Best parameters: a={best_a}, b={best_b}, c={best_c}")
+    logging.info(f"Best accuracy: {study.best_value}")
     
     return [rf_model, knn_model, lgb_model], best_a, best_b, best_c
 

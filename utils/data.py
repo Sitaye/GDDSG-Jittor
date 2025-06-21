@@ -1,8 +1,13 @@
 import numpy as np
 import os
-from torchvision import datasets, transforms
+# from torchvision import datasets, transforms
 from utils.toolkit import split_images_labels
-import torch
+# import torch
+from PIL import Image
+import jittor as jt
+import jittor.transform as transforms
+from jittor import dataset
+from jittor_utils import download
 
 # CUB, ImageNet-R, ImageNet-A, OmnibenchMark and VTAB are the versions defined at https://github.com/zhoudw-zdw/RevisitingCIL from here: 
 #   @article{zhou2023revisiting,
@@ -39,7 +44,8 @@ def build_transform(is_train, args,isCifar=False):
         else:
             size = int((256 / 224) * input_size)
         t.append(
-            transforms.Resize(size, interpolation=transforms.InterpolationMode.BICUBIC),  # to maintain same ratio w.r.t. 224 images
+            # transforms.Resize(size, interpolation=transforms.InterpolationMode.BICUBIC),  # to maintain same ratio w.r.t. 224 images
+            transforms.Resize(size, mode=Image.BICUBIC),  # to maintain same ratio w.r.t. 224 images
         )
         t.append(transforms.CenterCrop(input_size))
     t.append(transforms.ToTensor())
@@ -60,17 +66,21 @@ class iFMNIST224(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
     def download_data(self):
         do_download=True
         if os.path.isfile('./data/FashionMNIST/raw'):
             do_download=False
-        train_dataset = datasets.FashionMNIST("./data/", train=True, download=do_download)
-        test_dataset = datasets.FashionMNIST("./data", train=False, download=False)
+        # train_dataset = datasets.FashionMNIST("./data/", train=True, download=do_download)
+        # test_dataset = datasets.FashionMNIST("./data", train=False, download=False)
+        train_dataset = dataset.FashionMNIST("./data/", train=True, download=do_download)
+        test_dataset = dataset.FashionMNIST("./data", train=False, download=False)
         self.train_data, self.train_targets = train_dataset.data, np.array(
             train_dataset.targets
         )
-        self.train_data = torch.stack([self.train_data,self.train_data,self.train_data],dim = 3)
+        # self.train_data = torch.stack([self.train_data,self.train_data,self.train_data],dim = 3)
+        self.train_data = jt.stack([self.train_data,self.train_data,self.train_data],dim = 3)
         #print(self.train_data.shape)
         self.test_data, self.test_targets = test_dataset.data, np.array(
             test_dataset.targets
@@ -90,14 +100,17 @@ class iCIFAR10224(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         do_download=True
         if os.path.isfile('./data/cifar-10-batches-py/test_batch'):
             do_download=False
-        train_dataset = datasets.cifar.CIFAR10("./data/", train=True, download=do_download)
-        test_dataset = datasets.cifar.CIFAR10("./data", train=False, download=False)
+        # train_dataset = datasets.cifar.CIFAR10("./data/", train=True, download=do_download)
+        # test_dataset = datasets.cifar.CIFAR10("./data", train=False, download=False)
+        train_dataset = dataset.cifar.CIFAR10("./data/", train=True, download=do_download)
+        test_dataset = dataset.cifar.CIFAR10("./data", train=False, download=False)
         self.train_data, self.train_targets = train_dataset.data, np.array(
             train_dataset.targets
         )
@@ -116,14 +129,17 @@ class iNMNIST224(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         train_dir = "./data/nmnist/notMNIST_large/"
         test_dir = "./data/nmnist/notMNIST_small/"
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        # train_dset = datasets.ImageFolder(train_dir)
+        # test_dset = datasets.ImageFolder(test_dir)
+        train_dset = dataset.ImageFolder(train_dir)
+        test_dset = dataset.ImageFolder(test_dir)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -141,14 +157,17 @@ class iCIFAR224(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         do_download=True
         if os.path.isfile('./data/cifar-100-python/train'):
             do_download=False
-        train_dataset = datasets.cifar.CIFAR100("./data/", train=True, download=do_download)
-        test_dataset = datasets.cifar.CIFAR100("./data/", train=False, download=False)
+        # train_dataset = datasets.cifar.CIFAR100("./data/", train=True, download=do_download)
+        # test_dataset = datasets.cifar.CIFAR100("./data/", train=False, download=False)
+        train_dataset = dataset.cifar.CIFAR100("./data/", train=True, download=do_download)
+        test_dataset = dataset.cifar.CIFAR100("./data/", train=False, download=False)
         self.train_data, self.train_targets = train_dataset.data, np.array(
             train_dataset.targets
         )
@@ -167,15 +186,18 @@ class iImageNetR(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         # as per Zhou et al (2023), download from https://drive.google.com/file/d/1SG4TbiL8_DooekztyCVK8mPmfhMo8fkR/view?usp=sharing) or Onedrive: [link](https://entuedu-my.sharepoint.com/:u:/g/personal/n2207876b_e_ntu_edu_sg/EU4jyLL29CtBsZkB6y-JSbgBzWF5YHhBAUz1Qw8qM2954A?e=hlWpNW
         train_dir = "./data/imagenet-r/train/"
         test_dir = "./data/imagenet-r/test/"
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        # train_dset = datasets.ImageFolder(train_dir)
+        # test_dset = datasets.ImageFolder(test_dir)
+        train_dset = dataset.ImageFolder(train_dir)
+        test_dset = dataset.ImageFolder(test_dir)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -192,15 +214,18 @@ class iImageNetA(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         # as per Zhou et al (2023), download from  https://drive.google.com/file/d/19l52ua_vvTtttgVRziCZJjal0TPE9f2p/view?usp=sharing) or Onedrive: [link](https://entuedu-my.sharepoint.com/:u:/g/personal/n2207876b_e_ntu_edu_sg/ERYi36eg9b1KkfEplgFTW3gBg1otwWwkQPSml0igWBC46A?e=NiTUkL
         train_dir = "./data/imagenet-a/train/"
         test_dir = "./data/imagenet-a/test/"
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        # train_dset = datasets.ImageFolder(train_dir)
+        # test_dset = datasets.ImageFolder(test_dir)
+        train_dset = dataset.ImageFolder(train_dir)
+        test_dset = dataset.ImageFolder(test_dir)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -216,17 +241,40 @@ class DOG(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
-        train_dir = "./data/dogs/train/"
-        test_dir = "./data/dogs/test/"
+        images_url = "http://vision.stanford.edu/aditya86/ImageNetDogs/images.tar"
+        annotations_url = "http://vision.stanford.edu/aditya86/ImageNetDogs/lists.tar"
+        download_dir = "./data/"
+        images_tar_path = os.path.join(download_dir, "images.tar")
+        images_dir = os.path.join(download_dir, "Images")
+        annotations_tar_path = os.path.join(download_dir, "lists.tar")
+        import tarfile
+        if not os.path.exists(images_dir):
+            download(images_url, images_tar_path)
+            with tarfile.open(images_tar_path) as tar:
+                tar.extractall(path=download_dir)
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        if not os.path.exists(os.path.join(download_dir, "train_list.mat")):
+             download(annotations_url, annotations_tar_path)
+             with tarfile.open(annotations_tar_path) as tar:
+                 tar.extractall(path=download_dir)
 
-        self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
-        self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
+        from scipy.io import loadmat
+        train_mat = loadmat(os.path.join(download_dir, "train_list.mat"))
+        test_mat = loadmat(os.path.join(download_dir, "test_list.mat"))
+
+        train_image_paths = [os.path.join(images_dir, f[0][0]) for f in train_mat['file_list']]
+        train_image_labels = [label[0] - 1 for label in train_mat['labels']]
+        test_image_paths = [os.path.join(images_dir, f[0][0]) for f in test_mat['file_list']]
+        test_image_labels = [label[0] - 1 for label in test_mat['labels']]
+
+        self.train_data = np.array(train_image_paths)
+        self.train_targets = np.array(train_image_labels)
+        self.test_data = np.array(test_image_paths)
+        self.test_targets = np.array(test_image_labels)
 
 class CUB(iData):
     use_path = True
@@ -239,15 +287,18 @@ class CUB(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         # as per Zhou et al (2023) download from https://drive.google.com/file/d/1XbUpnWpJPnItt5zQ6sHJnsjPncnNLvWb/view?usp=sharing) or Onedrive: [link](https://entuedu-my.sharepoint.com/:u:/g/personal/n2207876b_e_ntu_edu_sg/EVV4pT9VJ9pBrVs2x0lcwd0BlVQCtSrdbLVfhuajMry-lA?e=L6Wjsc
         train_dir = "./data/cub/train/"
         test_dir = "./data/cub/test/"
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        # train_dset = datasets.ImageFolder(train_dir)
+        # test_dset = datasets.ImageFolder(test_dir)
+        train_dset = dataset.ImageFolder(train_dir)
+        test_dset = dataset.ImageFolder(test_dir)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -263,15 +314,18 @@ class omnibenchmark(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         # as per Zhou et al (2023), download from https://drive.google.com/file/d/1AbCP3zBMtv_TDXJypOCnOgX8hJmvJm3u/view?usp=sharing) or Onedrive: [link](https://entuedu-my.sharepoint.com/:u:/g/personal/n2207876b_e_ntu_edu_sg/EcoUATKl24JFo3jBMnTV2WcBwkuyBH0TmCAy6Lml1gOHJA?e=eCNcoA
         train_dir = "./data/omnibenchmark/train/"
         test_dir = "./data/omnibenchmark/test/"
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        # train_dset = datasets.ImageFolder(train_dir)
+        # test_dset = datasets.ImageFolder(test_dir)
+        train_dset = dataset.ImageFolder(train_dir)
+        test_dset = dataset.ImageFolder(test_dir)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -287,15 +341,18 @@ class vtab(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         # as per Zhou et al (2013), download from https://drive.google.com/file/d/1xUiwlnx4k0oDhYi26KL5KwrCAya-mvJ_/view?usp=sharing) or Onedrive: [link](https://entuedu-my.sharepoint.com/:u:/g/personal/n2207876b_e_ntu_edu_sg/EQyTP1nOIH5PrfhXtpPgKQ8BlEFW2Erda1t7Kdi3Al-ePw?e=Yt4RnV
         train_dir = "./data/vtab/train/"
         test_dir = "./data/vtab/test/"
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        # train_dset = datasets.ImageFolder(train_dir)
+        # test_dset = datasets.ImageFolder(test_dir)
+        train_dset = dataset.ImageFolder(train_dir)
+        test_dset = dataset.ImageFolder(test_dir)
 
         #print(train_dset.class_to_idx)
         #print(test_dset.class_to_idx)
@@ -314,14 +371,17 @@ class cars(iData):
 
     def __init__(self,use_input_norm):
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         train_dir = "./data/cars/train/"
         test_dir = "./data/cars/test/"
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        # train_dset = datasets.ImageFolder(train_dir)
+        # test_dset = datasets.ImageFolder(test_dir)
+        train_dset = dataset.ImageFolder(train_dir)
+        test_dset = dataset.ImageFolder(test_dir)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -338,7 +398,8 @@ class core50(iData):
     def __init__(self,inc,use_input_norm):
         self.inc=inc
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         #download from here: http://bias.csr.unibo.it/maltoni/download/core50/core50_imgs.npz
@@ -346,8 +407,10 @@ class core50(iData):
         #print(train_dir)
         test_dir = "./data/core50_imgs/test_3_7_10/"
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        # train_dset = datasets.ImageFolder(train_dir)
+        # test_dset = datasets.ImageFolder(test_dir)
+        train_dset = dataset.ImageFolder(train_dir)
+        test_dset = dataset.ImageFolder(test_dir)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -364,7 +427,8 @@ class cddb(iData):
     def __init__(self,inc,use_input_norm):
         self.inc=inc
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         #download from here: https://coral79.github.io/CDDB_web/
@@ -372,8 +436,10 @@ class cddb(iData):
         #print(train_dir)
         test_dir = "./data/CDDB/CDDB-hard_val/"
 
-        train_dset = datasets.ImageFolder(train_dir)
-        test_dset = datasets.ImageFolder(test_dir)
+        # train_dset = datasets.ImageFolder(train_dir)
+        # test_dset = datasets.ImageFolder(test_dir)
+        train_dset = dataset.ImageFolder(train_dir)
+        test_dset = dataset.ImageFolder(test_dir)
 
         self.train_data, self.train_targets = split_images_labels(train_dset.imgs)
         self.test_data, self.test_targets = split_images_labels(test_dset.imgs)
@@ -390,7 +456,8 @@ class domainnet(iData):
     def __init__(self,inc,use_input_norm):
         self.inc=inc
         if use_input_norm:
-            self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            # self.common_trsf = [transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
+            self.common_trsf = [transforms.ImageNormalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])]
 
     def download_data(self):
         #download from http://ai.bu.edu/M3SDA/#dataset (use "cleaned version")

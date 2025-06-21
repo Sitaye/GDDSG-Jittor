@@ -1,25 +1,31 @@
 import copy
 import logging
 import numpy as np
-import torch
-from torch import nn
-from torch import optim
-from torch.nn import functional as F
-from torch.utils.data import DataLoader
+# import torch
+# from torch import nn
+# from torch import optim
+# from torch.nn import functional as F
+# from torch.utils.data import DataLoader
 from inc_net import ResNetCosineIncrementalNet,SimpleVitNet
 from utils.toolkit import target2onehot, tensor2numpy, accuracy
-import torch.nn.functional as F
+# import torch.nn.functional as F
 from utils.maxsplit import maxsplit
 import json
 from tqdm import *
 import pandas as pd
 from utils.predictitid import *
+import jittor as jt
+from jittor import nn
+from jittor import optim
+from jittor.dataset import DataLoader
+from utils.toolkit import _set_eval
 
 num_workers = 8
 def select_random_pairs(tensor1, tensor2, ratio):
     num_elements = tensor1.size(0)
     num_selected = int(ratio * num_elements)
-    random_indices = torch.randperm(num_elements)[:num_selected]
+    # random_indices = torch.randperm(num_elements)[:num_selected]
+    random_indices = jt.randperm(num_elements)[:num_selected]
     selected_tensor1 = tensor1[random_indices]
     selected_tensor2 = tensor2[random_indices]
     return selected_tensor1, selected_tensor2
@@ -41,15 +47,20 @@ class BaseLearner(object):
         return acc_total,grouped,y_pred[:,0],y_true
 
     def _eval_cnn(self, loader):
-        self._network.eval()
+        # self._network.eval()
+        self._network = _set_eval(self._network)
         y_pred, y_true = [], []
         for _, (_, inputs, targets) in enumerate(loader):
-            inputs = inputs.to(self._device)
-            with torch.no_grad():
+            # inputs = inputs.to(self._device)
+            # with torch.no_grad():
+            with jt.no_grad():
                 outputs = self._network(inputs)["logits"]
-            predicts = torch.topk(outputs, k=1, dim=1, largest=True, sorted=True)[1] 
-            y_pred.append(predicts.cpu().numpy())
-            y_true.append(targets.cpu().numpy())
+            # predicts = torch.topk(outputs, k=1, dim=1, largest=True, sorted=True)[1] 
+            predicts = jt.topk(outputs, k=1, dim=1, largest=True, sorted=True)[1] 
+            # y_pred.append(predicts.cpu().numpy())
+            y_pred.append(predicts.numpy())
+            # y_true.append(targets.cpu().numpy())
+            y_true.append(targets.numpy())
         return np.concatenate(y_pred), np.concatenate(y_true)  
     
     def _evaluate(self, y_pred, y_true):
@@ -58,14 +69,18 @@ class BaseLearner(object):
         return acc_total,grouped 
     
     def _compute_accuracy(self, model, loader):
-        model.eval()
+        # model.eval()
+        model = _set_eval(model)
         correct, total = 0, 0
         for i, (_, inputs, targets) in enumerate(loader):
-            inputs = inputs.to(self._device)
-            with torch.no_grad():
+            # inputs = inputs.to(self._device)
+            # with torch.no_grad():
+            with jt.no_grad():
                 outputs = model(inputs)["logits"]
-            predicts = torch.max(outputs, dim=1)[1]
-            correct += (predicts.cpu() == targets).sum()
+            # predicts = torch.max(outputs, dim=1)[1]
+            predicts = jt.max(outputs, dim=1)[1]
+            # correct += (predicts.cpu() == targets).sum()
+            correct += (predicts == targets).sum()
             total += len(targets)
         return np.around(tensor2numpy(correct) * 100 / total, decimals=2)
 
@@ -92,6 +107,8 @@ class Learner(BaseLearner):
             self._batch_size= args["batch_size"]
         self.args=args
         self.metric = np.zeros((10,10))
+        self.results_log = []
+        self.loss_history = []
 
     def after_task(self):
         self._known_classes = self._classes_seen_so_far
@@ -100,8 +117,14 @@ class Learner(BaseLearner):
 
         self.ptask += 1
     
+    def cosine_similarity(self, x1, x2, dim=1, eps=1e-8):
+        x1_normalized = jt.normalize(x1, p=2, dim=dim, eps=eps)
+        x2_normalized = jt.normalize(x2, p=2, dim=dim, eps=eps)
+        return jt.sum(x1_normalized * x2_normalized, dim=dim)
+
     def replace_fc(self,trainloader):
-        self._network = self._network.eval()
+        # self._network = self._network.eval()
+        self._network = _set_eval(self._network)
 
         if self.args['use_RP']:
             self._network.fc.use_RP=True
@@ -112,21 +135,27 @@ class Learner(BaseLearner):
 
         Features_f = []
         label_list = []
-        with torch.no_grad():
+        # with torch.no_grad():
+        with jt.no_grad():
             for i, batch in enumerate(trainloader):
                 (_,data,label)=batch
-                data=data.cuda()
-                label=label.cuda()
+                # data=data.cuda()
+                # label=label.cuda()
                 embedding = self._network.convnet(data)
-                Features_f.append(embedding.cpu())
-                label_list.append(label.cpu())
-        Features_f = torch.cat(Features_f, dim=0)
-        label_list = torch.cat(label_list, dim=0)
+                # Features_f.append(embedding.cpu())
+                Features_f.append(embedding)
+                # label_list.append(label.cpu())
+                label_list.append(label)
+        # Features_f = torch.cat(Features_f, dim=0)
+        Features_f = jt.concat(Features_f, dim=0)
+        # label_list = torch.cat(label_list, dim=0)
+        label_list = jt.concat(label_list, dim=0)
         
         Y = target2onehot(label_list,self.total_classnum)
 
         if self.args['use_RP']:
-            if self.args['M'] > 0:  Features_h = torch.nn.functional.relu(Features_f @ self._network.fc.W_rand.cpu())
+            # if self.args['M'] > 0:  Features_h = torch.nn.functional.relu(Features_f @ self._network.fc.W_rand.cpu())
+            if self.args['M'] > 0:  Features_h = nn.relu(Features_f @ self._network.fc.W_rand)
             else:   Features_h=Features_f
             for class_index in np.unique(label_list):
                 data_index = (label_list==class_index).nonzero().squeeze(-1)
@@ -135,13 +164,16 @@ class Learner(BaseLearner):
                 self.cp[class_index] = class_prototype
                 cos_similarities = []
                 for feature in Features_class:
-                    cos_similarities.append(F.cosine_similarity(feature, self.cp[class_index], dim=0))
-                self.mean_dis[class_index] = torch.mean(torch.tensor(cos_similarities))
+                    # cos_similarities.append(F.cosine_similarity(feature, self.cp[class_index], dim=0))
+                    cos_similarities.append(self.cosine_similarity(feature, self.cp[class_index], dim=0))
+                # self.mean_dis[class_index] = torch.mean(torch.tensor(cos_similarities))
+                self.mean_dis[class_index] = jt.mean(cos_similarities)
             this_data = []
             for i in trange(len(Features_f), desc="Creating train data"):
                 my_data = []
                 for j in np.unique(label_list):
-                    my_data.append(torch.norm(Features_f[i] - self.cp[j],p = 2).item())
+                    # my_data.append(torch.norm(Features_f[i] - self.cp[j],p = 2).item())
+                    my_data.append(jt.norm(Features_f[i] - self.cp[j],p = 2).item())
                 this_data.append(my_data)
             this_data = np.array(this_data)
             df = pd.DataFrame(this_data)
@@ -152,7 +184,8 @@ class Learner(BaseLearner):
                         continue
                     flag = True
                     for pt_c in self.p2c[pt]:
-                        if F.cosine_similarity(self.cp[class_index],self.cp[pt_c],dim = 0) > self.mean_dis[pt_c]:
+                        # if F.cosine_similarity(self.cp[class_index],self.cp[pt_c],dim = 0) > self.mean_dis[pt_c]:
+                        if self.cosine_similarity(self.cp[class_index],self.cp[pt_c],dim = 0) > self.mean_dis[pt_c]:
                             flag = False
                             break
                     if flag: 
@@ -168,7 +201,8 @@ class Learner(BaseLearner):
                 edge = {}
                 for v in last_class:
                     for u in last_class:
-                        if F.cosine_similarity(self.cp[u],self.cp[v],dim = 0) > self.mean_dis[v]:
+                        # if F.cosine_similarity(self.cp[u],self.cp[v],dim = 0) > self.mean_dis[v]:
+                        if self.cosine_similarity(self.cp[u],self.cp[v],dim = 0) > self.mean_dis[v]:
                             if v not in edge:   edge[v] = []
                             edge[v].append(u)
                 
@@ -185,30 +219,55 @@ class Learner(BaseLearner):
             self.traing_data.append(df)
             Features_each_ptask = {}
             label_each_ptask = {}
-            print(f"Class Groups: {self.p2c}")
+            logging.info(f"Class Groups: {self.p2c}")
             for pt in range(self.ptask):
                 data_index = []
                 for index, label in enumerate(label_list):
                     if self.mp[label.item()] == pt:
                         data_index.append(index)
-                data_index = torch.tensor(data_index).long()
+                G_gpu = jt.array(self.G[pt]) if self.G[pt] is not None else None
+                Q_gpu = jt.array(self.Q[pt]) if self.Q[pt] is not None else None
+                # data_index = torch.tensor(data_index).long()
+                data_index = jt.array(data_index).long()
                 Features_each_ptask[pt] = Features_h[data_index]
                 label_each_ptask[pt] = Y[data_index]
-                self.Q[pt] = self.Q[pt] + Features_each_ptask[pt].T @ label_each_ptask[pt]
-                self.G[pt] = self.G[pt] + Features_each_ptask[pt].T @ Features_each_ptask[pt]
-                ridge = self.optimise_ridge_parameter(torch.cat((torch.tensor(self.reply_data[pt]), Features_each_ptask[pt]), dim=0),torch.cat((torch.tensor(self.reply_label[pt]) , label_each_ptask[pt]),dim = 0))
+                # self.Q[pt] = self.Q[pt] + Features_each_ptask[pt].T @ label_each_ptask[pt]
+                # self.G[pt] = self.G[pt] + Features_each_ptask[pt].T @ Features_each_ptask[pt]
+                # ridge = self.optimise_ridge_parameter(torch.cat((torch.tensor(self.reply_data[pt]), Features_each_ptask[pt]), dim=0),torch.cat((torch.tensor(self.reply_label[pt]) , label_each_ptask[pt]),dim = 0))
+                term_Q_update = Features_each_ptask[pt].transpose() @ label_each_ptask[pt]
+                term_G_update = Features_each_ptask[pt].transpose() @ Features_each_ptask[pt]
+                if Q_gpu is None:
+                    Q_gpu = term_Q_update
+                    G_gpu = term_G_update
+                else:
+                    Q_gpu = Q_gpu + term_Q_update
+                    G_gpu = G_gpu + term_G_update
+                if len(self.reply_data[pt]) > 0:
+                    combined_features = jt.concat((jt.array(self.reply_data[pt]), Features_each_ptask[pt]), dim=0)
+                    combined_labels = jt.concat((jt.array(self.reply_label[pt]), label_each_ptask[pt]), dim=0)
+                else:
+                    combined_features = Features_each_ptask[pt]
+                    combined_labels = label_each_ptask[pt]
+                ridge = self.optimise_ridge_parameter(combined_features, combined_labels)
                 s1,s2 = select_random_pairs(Features_each_ptask[pt],label_each_ptask[pt],0.2)
                 self.reply_data[pt].extend(s1.tolist())
                 self.reply_label[pt].extend(s2.tolist())
-                self.Wo[pt] = torch.linalg.solve(self.G[pt]+ridge*torch.eye(self.G[pt].size(dim=0)),self.Q[pt]).T
-            
+                # self.Wo[pt] = torch.linalg.solve(self.G[pt]+ridge*torch.eye(self.G[pt].size(dim=0)),self.Q[pt]).T
+                Wo_gpu = jt.linalg.solve(G_gpu+ridge*jt.init.eye(G_gpu.size(dim=0)),Q_gpu).transpose()
+                self.Q[pt] = Q_gpu.numpy()
+                self.G[pt] = G_gpu.numpy()
+                self.Wo[pt] = Wo_gpu.numpy()
+                del ridge, Q_gpu, G_gpu, Wo_gpu
+                jt.sync_all()
+                jt.gc()
         
     
     def test_for_all_task(self,now_task,data_manager):
         ave_acc = 0
         all_train_data = pd.concat(self.traing_data, ignore_index=True)
         models, best_a, best_b, best_c = train_model(all_train_data)
-        total_Wo = torch.zeros_like(self.Wo[0]) 
+        # total_Wo = torch.zeros_like(self.Wo[0]) 
+        total_Wo = jt.zeros_like(self.Wo[0]) 
         for i in range(len(self.Wo)-1):
             total_Wo = total_Wo + self.Wo[i]
         for past_task in range(now_task+1):
@@ -216,21 +275,27 @@ class Learner(BaseLearner):
             testloader = DataLoader(test_dataset, batch_size=self._batch_size, shuffle=False, num_workers=num_workers)
             Features_f = []
             label_list = []    
-            with torch.no_grad():
+            # with torch.no_grad():
+            with jt.no_grad():
                 for i, batch in enumerate(tqdm(testloader, desc="Processing test data")):
                     (_,data,label)=batch
-                    data=data.cuda()
-                    label=label.cuda()
+                    # data=data.cuda()
+                    # label=label.cuda()
                     embedding = self._network.convnet(data)
-                    Features_f.append(embedding.cpu())
-                    label_list.append(label.cpu())
-            Features_f = torch.cat(Features_f, dim=0)
-            label_list = torch.cat(label_list, dim=0)
+                    # Features_f.append(embedding.cpu())
+                    Features_f.append(embedding)
+                    # label_list.append(label.cpu())
+                    label_list.append(label)
+            # Features_f = torch.cat(Features_f, dim=0)
+            Features_f = jt.concat(Features_f, dim=0)
+            # label_list = torch.cat(label_list, dim=0)
+            label_list = jt.concat(label_list, dim=0)
             this_data = []
             for i in trange(len(Features_f), desc="Creating test data"):
                 my_data = []
                 for j in np.unique(label_list):
-                    my_data.append(torch.norm(Features_f[i] - self.cp[j],p = 2).item())
+                    # my_data.append(torch.norm(Features_f[i] - self.cp[j],p = 2).item())
+                    my_data.append(jt.norm(Features_f[i] - self.cp[j],p = 2).item())
                 this_data.append(my_data)
             this_data = np.array(this_data)
             df = pd.DataFrame(this_data)
@@ -239,19 +304,30 @@ class Learner(BaseLearner):
             df['orginal_label'] = [i.item() for i in label_list]
             task_id, acc = test_model(models,df,best_a,best_b,best_c)
             y_pred = []
-            if self.args['M'] > 0:  Features_h = torch.nn.functional.relu(Features_f @ self._network.fc.W_rand.cpu())
+            # if self.args['M'] > 0:  Features_h = torch.nn.functional.relu(Features_f @ self._network.fc.W_rand.cpu())
+            if self.args['M'] > 0:  Features_h = nn.relu(Features_f @ self._network.fc.W_rand)
             else:   Features_h=Features_f
             for i in range(Features_h.shape[0]):
-                score = Features_h[i]@total_Wo.T + 1.5*Features_h[i]@self.Wo[int(task_id[i])].T
+                # score = Features_h[i]@total_Wo.T + 1.5*Features_h[i]@self.Wo[int(task_id[i])].T
+                score = Features_h[i]@total_Wo.transpose() + 1.5*Features_h[i]@self.Wo[int(task_id[i])].transpose()
                 y_pred.append(score.argmax(dim = 0))
-            accuracy = sum([y_pred[i] == label_list[i] for i in range(len(y_pred))])/len(y_pred)
+            y_pred = jt.array(y_pred)
+            accuracy = (sum([y_pred[i] == label_list[i] for i in range(len(y_pred))])/len(y_pred))[0].item()
             ave_acc += accuracy
             self.metric[now_task][past_task] = accuracy
-            print(f"Task {now_task}, Backtest {past_task}, Accuracy {accuracy}, ID Accuracy {acc}")
-        print(f"Now Task {now_task}, Average Accuracy {ave_acc/(now_task+1)}")
+            log_entry = {
+                'current_task': now_task,
+                'evaluated_task': past_task,
+                'accuracy': accuracy,
+                'id_accuracy': acc
+            }
+            self.results_log.append(log_entry)
+            logging.info(f"Task {now_task}, Backtest {past_task}, Accuracy {accuracy}, ID Accuracy {acc}")
+        logging.info(f"Now Task {now_task}, Average Accuracy {ave_acc/(now_task+1)}")
 
     def after_all_task(self):
-        np.save('./mat/rand.npy',self._network.fc.W_rand.cpu())
+        # np.save('./mat/rand.npy',self._network.fc.W_rand.cpu())
+        np.save('./mat/rand.npy',self._network.fc.W_rand.numpy())
         for pt in range(self.ptask):
             np.save(f'./mat/Wo_{pt}.npy',self.Wo[pt])
 
@@ -260,13 +336,25 @@ class Learner(BaseLearner):
         ridges=10.0**np.arange(-8,9)
         num_val_samples=int(Features.shape[0]*0.8)
         losses=[]
-        Q_val=Features[0:num_val_samples,:].T @ Y[0:num_val_samples,:]
-        G_val=Features[0:num_val_samples,:].T @ Features[0:num_val_samples,:]
+        # Q_val=Features[0:num_val_samples,:].T @ Y[0:num_val_samples,:]
+        Q_val=Features[0:num_val_samples,:].transpose() @ Y[0:num_val_samples,:]
+        # G_val=Features[0:num_val_samples,:].T @ Features[0:num_val_samples,:]
+        G_val=Features[0:num_val_samples,:].transpose() @ Features[0:num_val_samples,:]
         for ridge in ridges:
-            Wo=torch.linalg.solve(G_val+ridge*torch.eye(G_val.size(dim=0)),Q_val).T
-            Y_train_pred=Features[num_val_samples::,:]@Wo.T
-            losses.append(F.mse_loss(Y_train_pred,Y[num_val_samples::,:]))
+            # Wo=torch.linalg.solve(G_val+ridge*torch.eye(G_val.size(dim=0)),Q_val).T
+            Wo=jt.linalg.solve(G_val+ridge*jt.init.eye(G_val.size(dim=0)),Q_val).transpose()
+            # Y_train_pred=Features[num_val_samples::,:]@Wo.T
+            Y_train_pred=Features[num_val_samples::,:]@Wo.transpose()
+            # losses.append(F.mse_loss(Y_train_pred,Y[num_val_samples::,:]))
+            losses.append(nn.mse_loss(Y_train_pred,Y[num_val_samples::,:]))
+        min_loss = np.min(np.array(losses))
         ridge=ridges[np.argmin(np.array(losses))]
+        self.loss_history.append({
+            'task': self._cur_task,
+            'ptask': self.ptask,
+            'optimal_lambda': ridge,
+            'min_mse_loss': min_loss
+        })
         logging.info("Optimal lambda: "+str(ridge))
         return ridge
     
@@ -289,7 +377,7 @@ class Learner(BaseLearner):
         test_dataset = data_manager.get_dataset(np.arange(0, self._classes_seen_so_far), source="test", mode="test" )
         self.test_loader = DataLoader(test_dataset, batch_size=self._batch_size, shuffle=False, num_workers=num_workers)
         if len(self._multiple_gpus) > 1:
-            print('Multiple GPUs')
+            logging.info('Multiple GPUs')
             self._network = nn.DataParallel(self._network, self._multiple_gpus)
         self._train(self.train_loader, self.test_loader, self.train_loader_for_CPs)
         if len(self._multiple_gpus) > 1:
@@ -301,38 +389,45 @@ class Learner(BaseLearner):
                 for name, param in self._network.convnet.named_parameters():
                     if is_first_session:
                         if "head." not in name and "ssf_scale" not in name and "ssf_shift_" not in name: 
-                            param.requires_grad = False
+                            # param.requires_grad = False
+                            param.stop_grad()
                     else:
-                        param.requires_grad = False
+                        # param.requires_grad = False
+                        param.stop_grad()
         else:
             if isinstance(self._network.convnet, nn.Module):
                 for name, param in self._network.convnet.named_parameters():
                     if is_first_session:
                         if "ssf_scale" not in name and "ssf_shift_" not in name: 
-                            param.requires_grad = False
+                            # param.requires_grad = False
+                            param.stop_grad()
                     else:
-                        param.requires_grad = False
+                        # param.requires_grad = False
+                        param.stop_grad()
 
     def show_num_params(self,verbose=False):
         total_params = sum(p.numel() for p in self._network.parameters())
         logging.info(f'{total_params:,} total parameters.')
-        total_trainable_params = sum(p.numel() for p in self._network.parameters() if p.requires_grad)
+        # total_trainable_params = sum(p.numel() for p in self._network.parameters() if p.requires_grad)
+        total_trainable_params = sum(p.numel() for p in self._network.parameters() if not p.is_stop_grad())
         logging.info(f'{total_trainable_params:,} training parameters.')
         if total_params != total_trainable_params and verbose:
             for name, param in self._network.named_parameters():
-                if param.requires_grad:
-                    print(name, param.numel())
+                # if param.requires_grad:
+                if not param.is_stop_grad():
+                    logging.info(name, param.numel())
 
     def _train(self, train_loader, test_loader, train_loader_for_CPs):
-        self._network.to(self._device)
+        # self._network.to(self._device)
         if self._cur_task == 0 and self.args["model_name"] in ['ncm','joint_linear']:
-             self.freeze_backbone()
+            self.freeze_backbone()
         if self.args["model_name"] in ['joint_linear','joint_full']: 
             if self.args["model_name"] =='joint_linear':
                 assert self.args['body_lr']==0.0
             self.show_num_params()
             optimizer = optim.SGD([{'params':self._network.convnet.parameters()},{'params':self._network.fc.parameters(),'lr':self.args['head_lr']}], momentum=0.9, lr=self.args['body_lr'],weight_decay=self.weight_decay)
-            scheduler=optim.lr_scheduler.MultiStepLR(optimizer,milestones=[100000])
+            # scheduler=optim.lr_scheduler.MultiStepLR(optimizer,milestones=[100000])
+            scheduler=jt.lr_scheduler.MultiStepLR(optimizer,milestones=[100000])
             logging.info("Starting joint training on all data using "+self.args["model_name"]+" method")
             self._init_train(train_loader, test_loader, optimizer, scheduler)
             self.show_num_params()
@@ -343,7 +438,8 @@ class Learner(BaseLearner):
                 if self.args["model_name"] != 'ncm':
                     self.show_num_params()
                     optimizer = optim.SGD(self._network.parameters(), momentum=0.9, lr=self.args['body_lr'],weight_decay=self.weight_decay)
-                    scheduler=optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args['tuned_epoch'], eta_min=self.min_lr)
+                    # scheduler=optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args['tuned_epoch'], eta_min=self.min_lr)
+                    scheduler=jt.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.args['tuned_epoch'], eta_min=self.min_lr)
                     logging.info("Starting PETL training on first task using "+self.args["model_name"]+" method")
                     self._init_train(train_loader, test_loader, optimizer, scheduler)
                     self.freeze_backbone()
@@ -351,7 +447,8 @@ class Learner(BaseLearner):
                     self.setup_RP()
             if self.is_dil and self.dil_init==False:
                 self.dil_init=True
-                self._network.fc.weight.data.fill_(0.0)
+                # self._network.fc.weight.data.fill_(0.0)
+                jt.init.constant_(self._network.fc.weight, 0.0)
             self.replace_fc(train_loader_for_CPs)
             self.show_num_params()
         
@@ -366,15 +463,21 @@ class Learner(BaseLearner):
         self.p2c[self.ptask] = []
         if self.args['M']>0:
             M = self.args['M']
-            self._network.fc.weight = nn.Parameter(torch.Tensor(self._network.fc.out_features, M).to(device='cuda')) #num classes in task x M
+            # self._network.fc.weight = nn.Parameter(torch.Tensor(self._network.fc.out_features, M).to(device='cuda')) #num classes in task x M
+            self._network.fc.weight = jt.empty((self._network.fc.out_features, M)) #num classes in task x M
             self._network.fc.reset_parameters()
-            self._network.fc.W_rand = torch.randn(self._network.fc.in_features,M).to(device='cuda')
-            self.W_rand = copy.deepcopy(self._network.fc.W_rand) #make a copy that gets passed each time the head is replaced
+            # self._network.fc.W_rand = torch.randn(self._network.fc.in_features,M).to(device='cuda')
+            self._network.fc.W_rand = jt.randn((self._network.fc.in_features,M))
+            # self.W_rand = copy.deepcopy(self._network.fc.W_rand) #make a copy that gets passed each time the head is replaced
+            self.W_rand = self._network.fc.W_rand.clone() #make a copy that gets passed each time the head is replaced
         else:
             M = self._network.fc.in_features #this M is L in the paper
-        self.Q = [torch.zeros(M,self.total_classnum)]
-        self.G = [torch.zeros(M,M)]
-        self.Wo = [torch.zeros(M,self.total_classnum)]
+        # self.Q = [torch.zeros(M,self.total_classnum)]
+        self.Q = [None]
+        # self.G = [torch.zeros(M,M)]
+        self.G = [None]
+        # self.Wo = [torch.zeros(M,self.total_classnum)]
+        self.Wo = [None]
         self.mask = [set() for _ in range(100)]
         self.update_wo = [True for _ in range(100)]
         self.traing_data = []
@@ -386,9 +489,12 @@ class Learner(BaseLearner):
             M = self.args['M']
         else:
             M = self._network.fc.in_features
-        self.Q.append(torch.zeros(M,self.total_classnum))
-        self.G.append(torch.zeros(M,M))
-        self.Wo.append(torch.zeros(M,self.total_classnum))
+        # self.Q.append(torch.zeros(M,self.total_classnum))
+        self.Q.append(None)
+        # self.G.append(torch.zeros(M,M))
+        self.G.append(None)
+        # self.Wo.append(torch.zeros(M,self.total_classnum))
+        self.Wo.append(None)
         self.ptask += 1
         self.p2c[self.ptask] = []
         self.mask.append(set())

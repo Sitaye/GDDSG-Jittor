@@ -2,12 +2,18 @@
 Reference:
 https://github.com/pytorch/vision/blob/master/torchvision/models/resnet.py
 '''
-import torch
-import torch.nn as nn
-try:
-    from torchvision.models.utils import load_state_dict_from_url
-except:
-    from torch.hub import load_state_dict_from_url
+# import torch
+# import torch.nn as nn
+# try:
+#     from torchvision.models.utils import load_state_dict_from_url
+# except:
+#     from torch.hub import load_state_dict_from_url
+import logging
+import os
+import jittor as jt
+from jittor import nn
+import jittor_utils
+from jittor_utils.load_pytorch import load_pytorch
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
@@ -26,6 +32,20 @@ model_urls = {
     'wide_resnet50_2': 'https://download.pytorch.org/models/wide_resnet50_2-95faca4d.pth',
     'wide_resnet101_2': 'https://download.pytorch.org/models/wide_resnet101_2-32ee1156.pth',
 }
+
+def load_state_dict_from_url(url, model_dir="./models", progress=True):
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+    filename = os.path.basename(url)
+    filepath = os.path.join(model_dir, filename)
+
+    if not os.path.exists(filepath):
+        logging.info(f"Downloading {url} to {filepath}...")
+        jittor_utils.download(url, filepath)
+    else:
+        logging.info(f"Using cached model from {filepath}.")
+
+    return load_pytorch(filepath)
 
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -55,13 +75,15 @@ class BasicBlock(nn.Module):
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
+        # self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
         self.stride = stride
 
-    def forward(self, x):
+    # def forward(self, x):
+    def execute(self, x):
         identity = x
 
         out = self.conv1(x)
@@ -97,11 +119,13 @@ class Bottleneck(nn.Module):
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        # self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
         self.downsample = downsample
         self.stride = stride
 
-    def forward(self, x):
+    # def forward(self, x):
+    def execute(self, x):
         identity = x
 
         out = self.conv1(x)
@@ -173,7 +197,8 @@ class ResNet(nn.Module):
 
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = norm_layer(self.inplanes)
-        self.relu = nn.ReLU(inplace=True)
+        # self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU()
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
 
@@ -244,7 +269,8 @@ class ResNet(nn.Module):
         x_4 = self.layer4(x_3)  # [bs, 512, 4, 4]
 
         pooled = self.avgpool(x_4)  # [bs, 512, 1, 1]
-        features = torch.flatten(pooled, 1)  # [bs, 512]
+        # features = torch.flatten(pooled, 1)  # [bs, 512]
+        features = jt.flatten(pooled, 1)  # [bs, 512]
         # x = self.fc(x)
 
         # return {
@@ -253,9 +279,10 @@ class ResNet(nn.Module):
         # }
         return features
 
-    def forward(self, x):
+    # def forward(self, x):
+    def execute(self, x):
         return self._forward_impl(x)
-
+    
     @property
     def last_conv(self):
         if hasattr(self.layer4[-1], 'conv3'):
@@ -269,7 +296,8 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
     if pretrained:
         state_dict = load_state_dict_from_url(model_urls[arch],
                                               progress=progress)
-        model.load_state_dict(state_dict,strict=False)
+        # model.load_state_dict(state_dict,strict=False)
+        model.load_state_dict(state_dict)
     return model
 
 

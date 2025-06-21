@@ -1,72 +1,126 @@
-# Order-Robust Class Incremental Learning: Graph-Driven Dynamic Similarity Grouping
+This codebase contains the Jittor implementation of ***Order-Robust Class Incremental Learning: Graph-Driven Dynamic Similarity Grouping***, achieving alignment between experiments and performance.
 
-<div align="center">
+## Requirements
 
-<div>
-  <a href='https://aignlai.github.io/' target='_blank'>Guannan Lai</a><sup>1</sup>&emsp;
-  <a href='https://scholar.google.com/citations?user=P42FoNwAAAAJ&hl=zh-TW&oi=sra' target='_blank'>Yujie Li</a><sup>1,2</sup>&emsp;
-  <a href='https://scholar.google.com/citations?user=L7AIhMkAAAAJ&hl=zh-CN' target='_blank'>Xiangkun Wang</a><sup>1</sup>&emsp;
-  <a href='https://scholar.google.com/citations?hl=zh-CN&user=sQpMBqsAAAAJ' target='_blank'>Junbo Zhang</a><sup>3</sup>&emsp;
-  <a href='https://scholar.google.com/citations?user=eLsZxC4AAAAJ' target='_blank'>Tianrui Li</a><sup>4</sup>&emsp;
-  <a href='https://scholar.google.com/citations?hl=zh-CN&user=DCX8lbsAAAAJ&view_op=list_works&sortby=pubdate' target='_blank'>Xin Yang</a><sup>1</sup>&emsp;
-</div>
-<div>
+- Python >= 3.9
+- a **CUDA** toolkit
+- a **C** compiler (compatible with CUDA)
 
-  <sup>1</sup>School of Computer and Artificial Intelligence, Southwestern University of Finance and Economics &emsp;
-  <sup>2</sup>The Leiden Institute of Advanced Computer Science (LIACS), Leiden University&emsp;
-  <sup>3</sup>JD Intelligent Cities Research &emsp;
-  <sup>4</sup>School of Computing and Artificial Intelligence, Southwest Jiaotong University
+The system and hardware I used and tested in:
 
-</div>
-</div>
+- Ubuntu 22.04
+- 20 vCPU AMD EPYC 7642 48-Core Processor
+- Nvidia RTX 3090 (24GB)
 
-<p align="center">
-  For inquiries, please contact: <a href="mailto:aignlai@163.com">aignlai@163.com</a>
-</p>
+## Environment setup
 
-
-🎉The code repository for "Order-Robust Class Incremental Learning: Graph-Driven Dynamic Similarity Grouping" (CVPR 2025) in PyTorch. If you use any content of this repo for your work, please cite the following bib entry:
-
-```
-@inproceedings{lai2024order, 
-    title={Order-Robust Class Incremental Learning: Graph-Driven Dynamic Similarity Grouping}, 
-    author={Lai, Guannan and Li, Yujie and Wang, Xiangkun and Zhang, Junbo and Li, Tianrui and Yang, Xin}, 
-    booktitle={CVPR}, 
-    year={2025} 
-}
-```
-
-## Overview
-
-This paper proposes a method called **GDDSG (Graph-Driven Dynamic Similarity Grouping)** to address the issues of **class order sensitivity** and **intra-task class conflicts** in **Class Incremental Learning (CIL)**. The core idea is to reduce the impact of class order on model performance and to mitigate confusion caused by similar classes within the same task. Through theoretical analysis, we demonstrate that reducing inter-class similarity can enhance model robustness by increasing the differences between optimal parameters across tasks. The GDDSG method employs a graph-based approach, where a similarity graph is constructed using the Welsh-Powell algorithm to group dissimilar classes together. Independent classifiers are then trained for each group, and the results are combined for predictions. Additionally, an incremental updating mechanism ensures that class groups are dynamically adjusted as new tasks arrive, optimizing the feature space and improving the model’s ability to handle class conflicts and forgetfulness.
-
-<img src='source/GDDSG.png' width='900'>
-
-## 🎊 Results
-
-We conducted experiments on four datasets to verify the competitive performance of GDDSG.
-
-<img src='source/result.png' width='900'>
-
-## Environment Setup
-
-This repository has been tested in an Anaconda environment. To replicate the environment precisely, please follow the instructions below:
+You need to have the development headers of Python installed (Jittor uses the python-config) and make sure that the python-config binary file is in the `path/to/your/venv/bin`.
 
 ```bash
-conda create -y -n GDDSG python=3.9
-conda activate GDDSG
-conda install -y pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.7 -c pytorch -c nvidia
-conda install -y -c anaconda pandas==1.5.2
-pip install tqdm==4.65.0 
-pip install timm==0.6.12
-pip install easydict scikit-learn lightgbm imbalanced-learn optuna
+pip install -r requirements.txt
 ```
-
-## Reproducing the Results
-
-To reproduce the results from the paper, execute the following commands:
+Then run following command to test your Jittor dependencies:
 
 ```bash
-python main.py -d 'datasetname'
+python -m jittor.test.test_example
+```
+This command will automatically install the latest CUDA toolkit that is compatible with your CUDA driver.
+
+If you encounter any errors, you may need to adjust the version of your C compiler to match that of your CUDA toolkit, in order to avoid conflicts with new features.
+
+If you already have the CUDA toolkit installed, set the environment variables manually.
+
+```bash
+# If other compiler is used, change cc_path
+export cc_path="clang++-8"
+# Replace this var with your nvcc location
+export nvcc_path="/usr/local/cuda/bin/nvcc" 
 ```
 
+## Dataset preparation
+
+You can manually download datasets as follows and move them to `./data/`:
+
+- *CIFAR100*: will be automatically downloaded by the code.
+- *CUB200*: Google Drive: [link](https://drive.google.com/file/d/1XbUpnWpJPnItt5zQ6sHJnsjPncnNLvWb/view?usp=sharing) or Onedrive: [link](https://entuedu-my.sharepoint.com/:u:/g/personal/n2207876b_e_ntu_edu_sg/EVV4pT9VJ9pBrVs2x0lcwd0BlVQCtSrdbLVfhuajMry-lA?e=L6Wjsc) (CAPTCHA needed)
+- *Stanford Dogs*: will be automatically downloaded by the code.
+- *OmniBenchmark*: Google Drive: [link](https://drive.google.com/file/d/1AbCP3zBMtv_TDXJypOCnOgX8hJmvJm3u/view?usp=sharing) or Onedrive: [link](https://entuedu-my.sharepoint.com/:u:/g/personal/n2207876b_e_ntu_edu_sg/EcoUATKl24JFo3jBMnTV2WcBwkuyBH0TmCAy6Lml1gOHJA?e=eCNcoA) (CAPTCHA needed)
+
+
+## Pre-trained model
+
+I used [ViT.jittor](https://github.com/li-xl/ViT.jittor) (reproduced from [timm](https://github.com/huggingface/pytorch-image-models)) as the structure of the Vision Transformer. I downloaded the model weights file from the url in timm and converted it using `convert_weights.py`.
+
+Please ensure that you place the converted weights file in the `./models` and modify the url in the `./vit/config.py`.
+
+
+## Training & Evaluation
+
+Run the following command to train and evaluate the specified dataset:
+
+```bash
+# python main.py -d 'dataset_name'. For example, CIFAR100 dataset.
+python main.py -d cifar224
+```
+Or run the following script to perform training and evaluation on the four datasets simultaneously:
+
+```bash
+./run.sh
+```
+You can modify the parameters in `dataset_name_publish.csv` where *dataset_name* is the name of the specified dataset.
+
+## Results
+
+### Table 1. Average final accuracy $A_N(\uparrow)$ on four datasets.
+
+| Frame | CIFAR100 | CUB200 | Dog | OB |
+|:-:|:-:|:-:|:-:|:-:|
+|Jittor(*this repo*)| 92.66 ± 0.22 | 91.08 ± 1.91 | 93.33 ± 1.08 | 86.57 ± 0.51 |
+|PyTorch(*upstream*)| 94.00 ± 0.03 | 91.64 ± 1.86 | 92.64 ± 0.48 | 87.33 ± 0.32 |
+
+### Table 2. Performance drop $F_N(\downarrow)$ on four datasets.
+
+| Frame | CIFAR100 | CUB200 | Dog | OB |
+|:-:|:-:|:-:|:-:|:-:|
+|Jittor(*this repo*)| 2.04 ± 0.59 | 0.48 ± 3.76 | 1.31 ± 0.45 | 1.25 ± 0.52 |
+|PyTorch(*upstream*)| 0.78 ± 0.09 | 1.92 ± 1.29 | 1.42 ± 0.08 | 0.96 ± 0.16 |
+
+### Table 3. Runtime usage $T_N(\%)$ on four datasets.
+
+| Frame | CIFAR100 | CUB200 | Dog | OB |
+|:-:|:-:|:-:|:-:|:-:|
+|Jittor(*this repo*)| 4029.26 (***-33.65%***) | 1312.94 (***-72.07%***) | 1979.91 (***-45.01%***) | 8023.46 (***-47.99%***) |
+|PyTorch(*upstream*)| 6072.44 | 4701.29 | 3600.76 | 15426.57 |
+
+### Figure 1. Minimum MSE Loss per task on four datasets.
+<table>
+  <tr>
+    <td align="center">CIFAR100</td>
+    <td align="center">CUB200</td>
+  </tr>
+  <tr>
+    <td><img src="./source/CIFAR100.png" height="200"/></td>
+    <td><img src="./source/CUB200.png" height="200"/></td>
+  </tr>
+  <tr>
+    <td align="center">Dog</td>
+    <td align="center">OB</td>
+  </tr>
+  <tr>
+    <td><img src="./source/Dog.png" height="200"/></td>
+    <td><img src="./source/OB.png" height="200"/></td>
+  </tr>
+</table>
+
+> [!NOTE]
+> For more details on the experiments, please refer to the [logs](./logs/logs_jittor/ncm).
+
+## Conclusion
+
+This repository has aligned the experimental results of the PyTorch and Jittor frameworks through experimentation and compared them with the results in the paper. Based on the experimental results, Jittor can reproduce PyTorch's experimental results well while improving the computing speed by nearly **50%**.
+
+In fact, there are other points to note in the experiment：
+
+1. PyTorch uses `def forward()` for forward propagation while Jittor uses `def execute()`.
+2. The implementation and underlying logic of many functions in Jittor differ from those in PyTorch. For example, using the `eval()` function will force all gradient updates to stop, but PyTorch will not.
+3. Jittor will place all `jt.Var` type variables on GPU if `jt.flags.use_cuda` is set to 1. In this case, you may need to  administer the GPU memory usage manually by deleting intermediate variables on time, and running `jt.sync_all()` and `jt.gc()`.

@@ -2,9 +2,11 @@ import logging
 import numpy as np
 from PIL import Image
 import PIL
-from torch.utils.data import Dataset
-from torchvision import transforms
+# from torch.utils.data import Dataset
+# from torchvision import transforms
 from utils.data import iCIFAR224, iImageNetR, iFMNIST224, iCIFAR10224, iNMNIST224,iImageNetA, CUB, omnibenchmark, vtab, cars, core50, cddb, domainnet,build_transform,DOG
+from jittor.dataset import Dataset
+from jittor import transform as transforms
 
 class DataManager(object):
     def __init__(self, dataset_name, shuffle, seed, init_cls, increment,use_input_norm=False):
@@ -113,6 +115,7 @@ class DataManager(object):
 
 class DummyDataset(Dataset):
     def __init__(self, images, labels, trsf, use_path=False):
+        super().__init__()
         assert len(images) == len(labels), "Data size error!"
         self.images = images
         self.labels = labels
@@ -187,5 +190,5 @@ def pil_loader(path):
             return 1,img.convert("RGB")
     except (IOError, OSError, PIL.UnidentifiedImageError) as e:
         # Handle the error gracefully, for example, you can log it and return None
-        print(f"Error loading image at path: {path}. Error: {e}")
+        logging.info(f"Error loading image at path: {path}. Error: {e}")
         return 0,0

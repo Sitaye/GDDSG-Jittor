@@ -1,0 +1,19 @@
+# --extra-index-url https://download.pytorch.org/whl/cu117
+
+# From origin environment setup
+# torch==1.13.1
+# torchvision==0.14.1
+# torchaudio==0.13.1
+# timm==0.6.12
+pandas==1.5.2
+tqdm==4.65.0
+easydict
+scikit-learn
+lightgbm
+imbalanced-learn
+optuna
+networkx
+cupy-cuda12x
+
+# Jittor implementation
+jittor==1.3.9.14
