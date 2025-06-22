@@ -89,8 +89,8 @@ You can modify the parameters in `dataset_name_publish.csv` where *dataset_name*
 
 | Frame | CIFAR100 | CUB200 | Dog | OB |
 |:-:|:-:|:-:|:-:|:-:|
-|Jittor(*this repo*)| 4029.26 (***-33.65%***) | 1312.94 (***-72.07%***) | 1979.91 (***-45.01%***) | 8023.46 (***-47.99%***) |
-|PyTorch(*upstream*)| 6072.44 | 4701.29 | 3600.76 | 15426.57 |
+|Jittor(*this repo*)| 4029.26s (***-33.65%***) | 1312.94s (***-72.07%***) | 1979.91s (***-45.01%***) | 8023.46s (***-47.99%***) |
+|PyTorch(*upstream*)| 6072.44s | 4701.29s | 3600.76s | 15426.57s |
 
 ### Figure 1. Minimum MSE Loss per task on four datasets.
 <table>
@@ -124,3 +124,4 @@ In fact, there are other points to note in the experiment：
 1. PyTorch uses `def forward()` for forward propagation while Jittor uses `def execute()`.
 2. The implementation and underlying logic of many functions in Jittor differ from those in PyTorch. For example, using the `eval()` function will force all gradient updates to stop, but PyTorch will not.
 3. Jittor will place all `jt.Var` type variables on GPU if `jt.flags.use_cuda` is set to 1. In this case, you may need to  administer the GPU memory usage manually by deleting intermediate variables on time, and running `jt.sync_all()` and `jt.gc()`.
+4. Jittor and PyTorch have different implementations of operators, and random seed generation also differs, so experiments are bound to produce errors. At the same time, Jittor's simplified implementation of ViT will also produce some errors.
